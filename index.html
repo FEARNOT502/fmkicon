@@ -356,17 +356,22 @@
         function draw() {
             if (!image) return;
 
+            // 공통 필터 문자열 생성
+            const filterString = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%)`;
+
+            // 1. 메인 캔버스 그리기
             mainCtx.clearRect(0, 0, editorSize, editorSize);
             mainCtx.save();
-            mainCtx.filter = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%)`;
+            mainCtx.filter = filterString; // 메인 캔버스에 필터 적용
             const scaledWidth = image.width * zoom;
             const scaledHeight = image.height * zoom;
             mainCtx.drawImage(image, pos.x, pos.y, scaledWidth, scaledHeight);
             mainCtx.restore();
 
+            // 2. 미리보기 캔버스 그리기
             previewCtx.clearRect(0, 0, 50, 50);
             previewCtx.save();
-            previewCtx.filter = mainCtx.filter;
+            previewCtx.filter = filterString; // 미리보기 캔버스에 동일한 필터 적용
             const sourceX = -pos.x / zoom;
             const sourceY = -pos.y / zoom;
             const sourceWidth = editorSize / zoom;
