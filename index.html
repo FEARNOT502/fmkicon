@@ -147,7 +147,10 @@
         function updateImage() {
             if (!previewImage.src) return;
             const filter = `brightness(${state.brightness}%) contrast(${state.contrast}%) saturate(${state.saturation}%)`;
-            const transform = `translate(${state.posX}px, ${state.posY}px) scale(${state.zoom / 100})`;
+            
+            // ✨ FIX: 기존의 중앙 정렬(translate(-50%, -50%))을 유지하면서 위치와 크기 조정을 적용합니다.
+            const transform = `translate(-50%, -50%) translate(${state.posX}px, ${state.posY}px) scale(${state.zoom / 100})`;
+            
             imageWrapper.style.transform = transform;
             previewImage.style.filter = filter;
             previewContainer.style.borderRadius = `${state.borderRadius}px`;
@@ -245,7 +248,7 @@
             }
             const canvas = generateFinalCanvas();
             const link = document.createElement('a');
-            link.download = 'my-image-50x50.png';
+            link.download = 'my-icon-50x50.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
         }
