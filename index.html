@@ -11,12 +11,10 @@
         input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; background: #e5e7eb; border-radius: 5px; outline: none; opacity: 0.7; transition: opacity .2s; }
         input[type=range]:hover { opacity: 1; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #5576C8; cursor: pointer; border-radius: 50%; border: 2px solid #ffffff; }
-        input[type=range]::-moz-range-thumb { width: 20px; height: 20px; background: #5576C8; cursor: pointer; border-radius: 50%; border: 2px solid #ffffff; }
         #crop-box { position: absolute; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); pointer-events: none; }
         #editor-container { touch-action: none; }
         input[type="color"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; width: 100%; height: 40px; background-color: transparent; border: 1px solid #d1d5db; border-radius: 0.5rem; cursor: pointer; }
         input[type="color"]::-webkit-color-swatch { border-radius: 0.375rem; border: none; }
-        input[type="color"]::-moz-color-swatch { border-radius: 0.375rem; border: none; }
     </style>
 </head>
 <body class="bg-white text-gray-800 flex items-center justify-center min-h-screen p-4">
@@ -32,6 +30,7 @@
                     <p class="text-xs text-gray-500 mt-2">또는 편집기에 이미지를 붙여넣으세요. (Ctrl+V)</p>
                 </div>
                 <div id="controls-panel" class="space-y-6 opacity-0 pointer-events-none transition-opacity duration-300">
+                    <!-- 컨트롤 UI -->
                     <div>
                         <h3 class="block mb-2 text-sm font-bold text-gray-600">이미지 조정</h3>
                         <div class="space-y-4">
@@ -112,239 +111,240 @@
     </div>
 
     <script>
-        // DOM 요소들
-        const imageUpload = document.getElementById('image-upload');
-        const controlsPanel = document.getElementById('controls-panel');
-        const editorContainer = document.getElementById('editor-container');
-        const editorPlaceholder = document.getElementById('editor-placeholder');
-        const downloadBtn = document.getElementById('download-btn');
-        const resetBtn = document.getElementById('reset-btn');
-        const mainCanvas = document.getElementById('main-canvas');
-        const mainCtx = mainCanvas.getContext('2d');
-        const previewCanvas = document.getElementById('preview-canvas');
-        const previewCtx = previewCanvas.getContext('2d');
-        const filenameInput = document.getElementById('filename-input');
+        // DOM 요소 캐싱
+        const $ = (selector) => document.querySelector(selector);
+        const $$ = (selector) => document.querySelectorAll(selector);
 
-        // 컨트롤러 요소들
-        const brightnessSlider = document.getElementById('brightness'), brightnessValue = document.getElementById('brightness-value');
-        const contrastSlider = document.getElementById('contrast'), contrastValue = document.getElementById('contrast-value');
-        const saturateSlider = document.getElementById('saturate'), saturateValue = document.getElementById('saturate-value');
-        const zoomSlider = document.getElementById('zoom'), zoomValue = document.getElementById('zoom-value');
-        const rotationSlider = document.getElementById('rotation'), rotationValue = document.getElementById('rotation-value');
-        
-        const shapeTypeRadios = document.querySelectorAll('input[name="shape-type"]');
-        const rectangleControls = document.getElementById('rectangle-controls');
-        const octagonControls = document.getElementById('octagon-controls');
-        const radiusSlider = document.getElementById('border-radius'), radiusValue = document.getElementById('radius-value');
-        const octagonCornerSlider = document.getElementById('octagon-corner'), octagonCornerValue = document.getElementById('octagon-corner-value');
-        
-        const borderWidthSlider = document.getElementById('border-width'), borderWidthValue = document.getElementById('border-width-value');
-        const borderColorInput = document.getElementById('border-color');
-
-        const bgTypeRadios = document.querySelectorAll('input[name="bg-type"]');
-        const bgColorControls = document.getElementById('bg-color-controls');
-        const bgColorInput = document.getElementById('bg-color');
+        const elements = {
+            imageUpload: $('#image-upload'),
+            controlsPanel: $('#controls-panel'),
+            editorContainer: $('#editor-container'),
+            editorPlaceholder: $('#editor-placeholder'),
+            mainCanvas: $('#main-canvas'),
+            previewCanvas: $('#preview-canvas'),
+            filenameInput: $('#filename-input'),
+            resetBtn: $('#reset-btn'),
+            downloadBtn: $('#download-btn'),
+            rectangleControls: $('#rectangle-controls'),
+            octagonControls: $('#octagon-controls'),
+            bgColorControls: $('#bg-color-controls'),
+        };
+        const mainCtx = elements.mainCanvas.getContext('2d');
+        const previewCtx = elements.previewCanvas.getContext('2d');
 
         // 상태 변수
-        let image = null, zoom = 1, minZoom = 1, rotation = 0;
-        let pos = { x: 0, y: 0 }, drag = { startX: 0, startY: 0, isDragging: false };
-        let filters = { brightness: 100, contrast: 100, saturate: 100 };
-        let shape = 'rectangle', borderRadius = 0, octagonCorner = 0.29, borderWidth = 0, borderColor = '#000000';
-        let isBgEnabled = false, bgColor = '#ffffff';
+        let image = null, editorSize = elements.editorContainer.clientWidth;
+        let state = {};
+        const initialState = {
+            zoom: 1, minZoom: 1, rotation: 0,
+            pos: { x: 0, y: 0 },
+            drag: { startX: 0, startY: 0, isDragging: false },
+            filters: { brightness: 100, contrast: 100, saturate: 100 },
+            shape: 'rectangle', borderRadius: 0, octagonCorner: 0.29,
+            borderWidth: 0, borderColor: '#000000',
+            isBgEnabled: false, bgColor: '#ffffff',
+        };
 
-        let editorSize = editorContainer.clientWidth;
-        mainCanvas.width = editorSize;
-        mainCanvas.height = editorSize;
-        downloadBtn.disabled = true;
-        resetBtn.disabled = true;
+        // 컨트롤과 상태를 연결하는 맵
+        const controlMap = {
+            brightness: { stateKey: 'filters.brightness', unit: '%' },
+            contrast: { stateKey: 'filters.contrast', unit: '%' },
+            saturate: { stateKey: 'filters.saturate', unit: '%' },
+            zoom: { stateKey: 'zoom', unit: '%', isMinZoom: true },
+            rotation: { stateKey: 'rotation', unit: '°' },
+            'border-radius': { stateKey: 'borderRadius', unit: 'px' },
+            'octagon-corner': { stateKey: 'octagonCorner', unit: '%', isRatio: true },
+            'border-width': { stateKey: 'borderWidth', unit: 'px' },
+            'border-color': { stateKey: 'borderColor' },
+            'bg-color': { stateKey: 'bgColor' },
+        };
 
-        // --- 이벤트 리스너 ---
-        imageUpload.addEventListener('change', (e) => { if (e.target.files[0]) loadImage(e.target.files[0]); });
-        window.addEventListener('paste', (e) => { for (const item of e.clipboardData.items) { if (item.type.includes('image')) { loadImage(item.getAsFile()); break; } } });
-        
-        const allControls = [brightnessSlider, contrastSlider, saturateSlider, zoomSlider, rotationSlider, radiusSlider, octagonCornerSlider, borderWidthSlider, borderColorInput, bgColorInput];
-        allControls.forEach(el => el.addEventListener('input', handleControlsChange));
-        
-        shapeTypeRadios.forEach(radio => radio.addEventListener('change', (e) => {
-            shape = e.target.value;
-            rectangleControls.classList.toggle('hidden', shape !== 'rectangle');
-            octagonControls.classList.toggle('hidden', shape !== 'octagon');
-            requestAnimationFrame(draw);
-        }));
-
-        bgTypeRadios.forEach(radio => radio.addEventListener('change', (e) => {
-            isBgEnabled = e.target.value === 'on';
-            bgColorControls.classList.toggle('hidden', !isBgEnabled);
-            requestAnimationFrame(draw);
-        }));
-
-        resetBtn.addEventListener('click', resetAllChanges);
-        downloadBtn.addEventListener('click', downloadIcon);
-        
-        // --- 함수 ---
+        // 이벤트 핸들러
         function handleControlsChange(e) {
             const { id, value } = e.target;
-            switch(id) {
-                case 'brightness': filters.brightness = value; brightnessValue.textContent = `${value}%`; break;
-                case 'contrast': filters.contrast = value; contrastValue.textContent = `${value}%`; break;
-                case 'saturate': filters.saturate = value; saturateValue.textContent = `${value}%`; break;
-                case 'zoom': zoom = value / 100 * minZoom; zoomValue.textContent = `${value}%`; break;
-                case 'rotation': rotation = value; rotationValue.textContent = `${value}°`; break;
-                case 'border-radius': borderRadius = value; radiusValue.textContent = `${value}px`; break;
-                case 'octagon-corner': octagonCorner = value / 100; octagonCornerValue.textContent = `${value}%`; break;
-                case 'border-width': borderWidth = value; borderWidthValue.textContent = `${value}px`; break;
-                case 'border-color': borderColor = value; break;
-                case 'bg-color': bgColor = value; break;
+            const control = controlMap[id];
+            if (!control) return;
+
+            let propValue = value;
+            if (control.isRatio) propValue /= 100;
+            if (control.isMinZoom) propValue = (value / 100) * state.minZoom;
+
+            // 중첩된 상태 키 업데이트 (e.g., 'filters.brightness')
+            const keys = control.stateKey.split('.');
+            let tempState = state;
+            for (let i = 0; i < keys.length - 1; i++) {
+                tempState = tempState[keys[i]];
             }
+            tempState[keys[keys.length - 1]] = propValue;
+            
+            const valueEl = $(`#${id}-value`);
+            if (valueEl) valueEl.textContent = `${value}${control.unit}`;
+            
             requestAnimationFrame(draw);
         }
 
         function resetAllChanges() {
             if (!image) return;
-            filters = { brightness: 100, contrast: 100, saturate: 100 };
-            [brightnessSlider, contrastSlider, saturateSlider].forEach(s => s.value = 100);
-            [brightnessValue, contrastValue, saturateValue].forEach(v => v.textContent = '100%');
+            state = JSON.parse(JSON.stringify(initialState)); // Deep copy
             
-            rotation = 0; rotationSlider.value = 0; rotationValue.textContent = '0°';
-            
-            shape = 'rectangle'; document.querySelector('input[name="shape-type"][value="rectangle"]').checked = true;
-            rectangleControls.classList.remove('hidden');
-            octagonControls.classList.add('hidden');
-            borderRadius = 0; radiusSlider.value = 0; radiusValue.textContent = '0px';
-            octagonCorner = 0.29; octagonCornerSlider.value = 29; octagonCornerValue.textContent = '29%';
-
-            borderWidth = 0; borderWidthSlider.value = 0; borderWidthValue.textContent = '0px';
-            borderColor = '#000000'; borderColorInput.value = '#000000';
-
-            isBgEnabled = false; document.querySelector('input[name="bg-type"][value="off"]').checked = true;
-            bgColorControls.classList.add('hidden');
-            bgColor = '#ffffff'; bgColorInput.value = '#ffffff';
-
             const hRatio = editorSize / image.width, vRatio = editorSize / image.height;
-            minZoom = Math.max(hRatio, vRatio);
-            zoom = minZoom; zoomSlider.value = 100; zoomValue.textContent = '100%';
-            pos.x = (editorSize - image.width * zoom) / 2;
-            pos.y = (editorSize - image.height * zoom) / 2;
+            state.minZoom = Math.max(hRatio, vRatio);
+            state.zoom = state.minZoom;
+            state.pos = { x: (editorSize - image.width * state.zoom) / 2, y: (editorSize - image.height * state.zoom) / 2 };
+
+            // UI 컨트롤 초기화
+            for (const id in controlMap) {
+                const el = $(`#${id}`);
+                if (!el) continue;
+                const keys = controlMap[id].stateKey.split('.');
+                let value = state;
+                keys.forEach(key => value = value[key]);
+                
+                if (controlMap[id].isRatio) value *= 100;
+                if (controlMap[id].isMinZoom) value = 100;
+                
+                el.value = value;
+                const valueEl = $(`#${id}-value`);
+                if (valueEl) valueEl.textContent = `${el.value}${controlMap[id].unit}`;
+            }
+            
+            $$('input[name="shape-type"]').forEach(r => r.checked = r.value === state.shape);
+            elements.rectangleControls.classList.remove('hidden');
+            elements.octagonControls.classList.add('hidden');
+
+            $$('input[name="bg-type"]').forEach(r => r.checked = r.value === (state.isBgEnabled ? 'on' : 'off'));
+            elements.bgColorControls.classList.add('hidden');
+            
             requestAnimationFrame(draw);
         }
 
         function loadImage(file) {
             const reader = new FileReader();
             reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    image = img;
-                    editorPlaceholder.classList.add('hidden');
-                    controlsPanel.classList.remove('opacity-0', 'pointer-events-none');
-                    editorContainer.style.cursor = 'move';
-                    downloadBtn.disabled = false; resetBtn.disabled = false;
+                image = new Image();
+                image.onload = () => {
+                    elements.editorPlaceholder.classList.add('hidden');
+                    elements.controlsPanel.classList.remove('opacity-0', 'pointer-events-none');
+                    elements.editorContainer.style.cursor = 'move';
+                    elements.downloadBtn.disabled = false;
+                    elements.resetBtn.disabled = false;
                     resetAllChanges();
                 };
-                img.src = e.target.result;
+                image.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
 
+        // 그리기 함수
+        function createShapePath(ctx, shape, x, y, width, height, options) {
+            ctx.beginPath();
+            if (shape === 'octagon') {
+                const sideOffset = width * options.octagonCorner;
+                ctx.moveTo(x + sideOffset, y);
+                ctx.lineTo(x + width - sideOffset, y);
+                ctx.lineTo(x + width, y + sideOffset);
+                ctx.lineTo(x + width, y + height - sideOffset);
+                ctx.lineTo(x + width - sideOffset, y + height);
+                ctx.lineTo(x + sideOffset, y + height);
+                ctx.lineTo(x, y + height - sideOffset);
+                ctx.lineTo(x, y + sideOffset);
+            } else {
+                const radius = options.borderRadius;
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + width - radius, y);
+                ctx.arcTo(x + width, y, x + width, y + radius, radius);
+                ctx.lineTo(x + width, y + height - radius);
+                ctx.arcTo(x + width, y + height, x + width - radius, y + height, radius);
+                ctx.lineTo(x + radius, y + height);
+                ctx.arcTo(x, y + height, x, y + height - radius, radius);
+                ctx.lineTo(x, y + radius);
+                ctx.arcTo(x, y, x + radius, y, radius);
+            }
+            ctx.closePath();
+        }
+
+        function drawFinalIcon(ctx, size) {
+            ctx.clearRect(0, 0, size, size);
+            ctx.save();
+            
+            createShapePath(ctx, state.shape, 0, 0, size, size, state);
+            if (state.isBgEnabled) {
+                ctx.fillStyle = state.bgColor;
+                ctx.fill();
+            }
+            ctx.clip();
+
+            ctx.save();
+            ctx.filter = `brightness(${state.filters.brightness}%) contrast(${state.filters.contrast}%) saturate(${state.filters.saturate}%)`;
+            ctx.translate(size / 2, size / 2);
+            ctx.rotate(state.rotation * Math.PI / 180);
+            ctx.translate(-size / 2, -size / 2);
+            ctx.drawImage(image, -state.pos.x / state.zoom, -state.pos.y / state.zoom, editorSize / state.zoom, editorSize / state.zoom, 0, 0, size, size);
+            ctx.restore();
+            
+            if (state.borderWidth > 0) {
+                const halfBorder = state.borderWidth / 2;
+                const borderState = { ...state, borderRadius: Math.max(0, state.borderRadius - halfBorder) };
+                createShapePath(ctx, state.shape, halfBorder, halfBorder, size - state.borderWidth, size - state.borderWidth, borderState);
+                ctx.strokeStyle = state.borderColor;
+                ctx.lineWidth = state.borderWidth;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
         function draw() {
             if (!image) return;
-            const size = 50;
-            const filterString = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%)`;
-            
             mainCtx.clearRect(0, 0, editorSize, editorSize);
             mainCtx.save();
             mainCtx.translate(editorSize / 2, editorSize / 2);
-            mainCtx.rotate(rotation * Math.PI / 180);
+            mainCtx.rotate(state.rotation * Math.PI / 180);
             mainCtx.translate(-editorSize / 2, -editorSize / 2);
-            mainCtx.filter = filterString;
-            mainCtx.drawImage(image, pos.x, pos.y, image.width * zoom, image.height * zoom);
+            mainCtx.filter = `brightness(${state.filters.brightness}%) contrast(${state.filters.contrast}%) saturate(${state.filters.saturate}%)`;
+            mainCtx.drawImage(image, state.pos.x, state.pos.y, image.width * state.zoom, image.height * state.zoom);
             mainCtx.restore();
             
-            previewCtx.clearRect(0, 0, size, size);
-            previewCtx.save();
-            
-            if (shape === 'octagon') {
-                createOctagonPath(previewCtx, 0, 0, size, size, octagonCorner);
-            } else {
-                createRoundedRectPath(previewCtx, 0, 0, size, size, borderRadius);
-            }
-
-            if (isBgEnabled) {
-                previewCtx.fillStyle = bgColor;
-                previewCtx.fill();
-            }
-            
-            previewCtx.clip();
-
-            previewCtx.save();
-            previewCtx.filter = filterString;
-            previewCtx.translate(size / 2, size / 2);
-            previewCtx.rotate(rotation * Math.PI / 180);
-            previewCtx.translate(-size / 2, -size / 2);
-            previewCtx.drawImage(image, -pos.x / zoom, -pos.y / zoom, editorSize / zoom, editorSize / zoom, 0, 0, size, size);
-            previewCtx.restore();
-            
-            if (borderWidth > 0) {
-                const halfBorder = borderWidth / 2;
-                if (shape === 'octagon') {
-                    createOctagonPath(previewCtx, halfBorder, halfBorder, size - borderWidth, size - borderWidth, octagonCorner);
-                } else {
-                    createRoundedRectPath(previewCtx, halfBorder, halfBorder, size - borderWidth, size - borderWidth, Math.max(0, borderRadius - halfBorder));
-                }
-                previewCtx.strokeStyle = borderColor;
-                previewCtx.lineWidth = borderWidth;
-                previewCtx.stroke();
-            }
-            previewCtx.restore();
-        }
-
-        function createRoundedRectPath(ctx, x, y, width, height, radius) {
-            ctx.beginPath();
-            ctx.moveTo(x + radius, y);
-            ctx.lineTo(x + width - radius, y);
-            ctx.arcTo(x + width, y, x + width, y + radius, radius);
-            ctx.lineTo(x + width, y + height - radius);
-            ctx.arcTo(x + width, y + height, x + width - radius, y + height, radius);
-            ctx.lineTo(x + radius, y + height);
-            ctx.arcTo(x, y + height, x, y + height - radius, radius);
-            ctx.lineTo(x, y + radius);
-            ctx.arcTo(x, y, x + radius, y, radius);
-            ctx.closePath();
-        }
-
-        function createOctagonPath(ctx, x, y, width, height, cornerRatio) {
-            const sideOffset = width * cornerRatio;
-            ctx.beginPath();
-            ctx.moveTo(x + sideOffset, y);
-            ctx.lineTo(x + width - sideOffset, y);
-            ctx.lineTo(x + width, y + sideOffset);
-            ctx.lineTo(x + width, y + height - sideOffset);
-            ctx.lineTo(x + width - sideOffset, y + height);
-            ctx.lineTo(x + sideOffset, y + height);
-            ctx.lineTo(x, y + height - sideOffset);
-            ctx.lineTo(x, y + sideOffset);
-            ctx.closePath();
+            drawFinalIcon(previewCtx, 50);
         }
 
         function downloadIcon() {
             if (!image) return;
             const tempCanvas = document.createElement('canvas');
-            const size = 50;
-            tempCanvas.width = size;
-            tempCanvas.height = size;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.drawImage(previewCanvas, 0, 0, size, size);
-            const filename = filenameInput.value || 'icon';
+            tempCanvas.width = 50;
+            tempCanvas.height = 50;
+            drawFinalIcon(tempCanvas.getContext('2d'), 50);
+            
             const link = document.createElement('a');
-            link.download = `${filename}.png`;
+            link.download = `${elements.filenameInput.value || 'icon'}.png`;
             link.href = tempCanvas.toDataURL('image/png');
             link.click();
         }
 
-        editorContainer.addEventListener('mousedown', (e) => { if (!image) return; drag.isDragging = true; drag.startX = e.clientX - pos.x; drag.startY = e.clientY - pos.y; editorContainer.style.cursor = 'grabbing'; });
-        window.addEventListener('mousemove', (e) => { if (drag.isDragging) { pos.x = e.clientX - drag.startX; pos.y = e.clientY - drag.startY; requestAnimationFrame(draw); } });
-        window.addEventListener('mouseup', () => { drag.isDragging = false; if (image) editorContainer.style.cursor = 'move'; });
-        editorContainer.addEventListener('wheel', (e) => { if (!image) return; e.preventDefault(); const d = e.deltaY > 0 ? -10 : 10; const v = Math.max(10, Math.min(500, parseInt(zoomSlider.value) + d)); zoomSlider.value = v; zoom = v / 100 * minZoom; zoomValue.textContent = `${v}%`; requestAnimationFrame(draw); });
-        window.addEventListener('resize', () => { const s=editorContainer.clientWidth; if(s===editorSize) return; editorSize=s; mainCanvas.width=s; mainCanvas.height=s; if(image){ const h=s/image.width,v=s/image.height,o=minZoom; minZoom=Math.max(h,v); zoom=zoom*(minZoom/o); pos.x=(s-image.width*zoom)/2; pos.y=(s-image.height*zoom)/2; requestAnimationFrame(draw); } });
+        // 초기화 및 이벤트 바인딩
+        function init() {
+            elements.mainCanvas.width = editorSize;
+            elements.mainCanvas.height = editorSize;
+            elements.downloadBtn.disabled = true;
+            elements.resetBtn.disabled = true;
+
+            elements.imageUpload.addEventListener('change', (e) => { if (e.target.files[0]) loadImage(e.target.files[0]); });
+            window.addEventListener('paste', (e) => { for (const item of e.clipboardData.items) { if (item.type.includes('image')) { loadImage(item.getAsFile()); break; } } });
+            
+            $$('#controls-panel input').forEach(el => el.addEventListener('input', handleControlsChange));
+            $$('input[name="shape-type"]').forEach(radio => radio.addEventListener('change', (e) => { state.shape = e.target.value; elements.rectangleControls.classList.toggle('hidden', state.shape !== 'rectangle'); elements.octagonControls.classList.toggle('hidden', state.shape !== 'octagon'); requestAnimationFrame(draw); }));
+            $$('input[name="bg-type"]').forEach(radio => radio.addEventListener('change', (e) => { state.isBgEnabled = e.target.value === 'on'; elements.bgColorControls.classList.toggle('hidden', !state.isBgEnabled); requestAnimationFrame(draw); }));
+
+            elements.resetBtn.addEventListener('click', resetAllChanges);
+            elements.downloadBtn.addEventListener('click', downloadIcon);
+
+            elements.editorContainer.addEventListener('mousedown', (e) => { if (!image) return; state.drag.isDragging = true; state.drag.startX = e.clientX - state.pos.x; state.drag.startY = e.clientY - state.pos.y; elements.editorContainer.style.cursor = 'grabbing'; });
+            window.addEventListener('mousemove', (e) => { if (!state.drag?.isDragging) return; state.pos.x = e.clientX - state.drag.startX; state.pos.y = e.clientY - state.drag.startY; requestAnimationFrame(draw); });
+            window.addEventListener('mouseup', () => { if(state.drag) state.drag.isDragging = false; if (image) elements.editorContainer.style.cursor = 'move'; });
+            elements.editorContainer.addEventListener('wheel', (e) => { if (!image) return; e.preventDefault(); const d = e.deltaY > 0 ? -10 : 10; const v = Math.max(10, Math.min(500, parseInt($('#zoom').value) + d)); $('#zoom').value = v; $('#zoom').dispatchEvent(new Event('input', { bubbles: true })); });
+            window.addEventListener('resize', () => { const s=elements.editorContainer.clientWidth; if(s===editorSize) return; editorSize=s; elements.mainCanvas.width=s; elements.mainCanvas.height=s; if(image){ const h=s/image.width,v=s/image.height,o=state.minZoom; state.minZoom=Math.max(h,v); state.zoom=state.zoom*(state.minZoom/o); state.pos.x=(s-image.width*state.zoom)/2; state.pos.y=(s-image.height*state.zoom)/2; requestAnimationFrame(draw); } });
+        }
+
+        init();
     </script>
 </body>
 </html>
