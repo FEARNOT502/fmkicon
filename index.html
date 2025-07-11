@@ -23,7 +23,7 @@
 
     <div class="w-full max-w-4xl bg-gray-100 rounded-xl shadow-2xl p-6 md:p-8">
         <h1 class="text-3xl font-bold text-center text-gray-900 mb-6">아이콘 메이커</h1>
-        <div class="flex flex-col lg:flex-row gap-8">
+        <div class="flex flex-col lg:flex-row gap-8 lg:items-center">
             <!-- 컨트롤 패널 -->
             <div class="w-full lg:w-1/3 space-y-6">
                 <div>
@@ -31,7 +31,7 @@
                     <input type="file" id="image-upload" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#5576C8] file:text-white hover:file:bg-[#4964a9] cursor-pointer">
                     <p class="text-xs text-gray-500 mt-2">또는 편집기에 이미지를 붙여넣으세요. (Ctrl+V)</p>
                 </div>
-                <div id="controls-panel" class="space-y-6 hidden">
+                <div id="controls-panel" class="space-y-6 opacity-0 pointer-events-none transition-opacity duration-300">
                     <div>
                         <h3 class="block mb-2 text-sm font-bold text-gray-600">이미지 조정</h3>
                         <div class="space-y-4">
@@ -45,6 +45,19 @@
                         <div class="space-y-4">
                             <div><label for="zoom" class="flex justify-between text-sm"><span>확대/축소</span><span id="zoom-value">100%</span></label><input type="range" id="zoom" min="10" max="500" value="100" class="w-full"></div>
                             <div><label for="rotation" class="flex justify-between text-sm"><span>회전</span><span id="rotation-value">0°</span></label><input type="range" id="rotation" min="-180" max="180" value="0" class="w-full"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="block mb-2 text-sm font-bold text-gray-600">배경 설정</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-4">
+                                <label><input type="radio" name="bg-type" value="off" checked class="mr-1">배경 X</label>
+                                <label><input type="radio" name="bg-type" value="on" class="mr-1">배경 O</label>
+                            </div>
+                            <div id="bg-color-controls" class="hidden">
+                                <label for="bg-color" class="text-sm">배경색</label>
+                                <input type="color" id="bg-color" value="#ffffff" class="w-full mt-1">
+                            </div>
                         </div>
                     </div>
                     <div>
@@ -76,7 +89,7 @@
                     </div>
                 </div>
             </div>
-            <div class="w-full lg:w-2/3 flex flex-col items-center gap-6 lg:pt-12">
+            <div class="w-full lg:w-2/3 flex flex-col items-center gap-6">
                 <div id="editor-container" class="relative w-full max-w-sm aspect-square bg-gray-300 rounded-lg overflow-hidden flex items-center justify-center">
                     <canvas id="main-canvas" class="absolute top-0 left-0"></canvas>
                     <div id="crop-box" class="w-full h-full border-2 border-dashed border-[#5576C8]"></div>
@@ -128,11 +141,16 @@
         const borderWidthSlider = document.getElementById('border-width'), borderWidthValue = document.getElementById('border-width-value');
         const borderColorInput = document.getElementById('border-color');
 
+        const bgTypeRadios = document.querySelectorAll('input[name="bg-type"]');
+        const bgColorControls = document.getElementById('bg-color-controls');
+        const bgColorInput = document.getElementById('bg-color');
+
         // 상태 변수
         let image = null, zoom = 1, minZoom = 1, rotation = 0;
         let pos = { x: 0, y: 0 }, drag = { startX: 0, startY: 0, isDragging: false };
         let filters = { brightness: 100, contrast: 100, saturate: 100 };
         let shape = 'rectangle', borderRadius = 0, octagonCorner = 0.29, borderWidth = 0, borderColor = '#000000';
+        let isBgEnabled = false, bgColor = '#ffffff';
 
         let editorSize = editorContainer.clientWidth;
         mainCanvas.width = editorSize;
@@ -144,13 +162,19 @@
         imageUpload.addEventListener('change', (e) => { if (e.target.files[0]) loadImage(e.target.files[0]); });
         window.addEventListener('paste', (e) => { for (const item of e.clipboardData.items) { if (item.type.includes('image')) { loadImage(item.getAsFile()); break; } } });
         
-        const allControls = [brightnessSlider, contrastSlider, saturateSlider, zoomSlider, rotationSlider, radiusSlider, octagonCornerSlider, borderWidthSlider, borderColorInput];
+        const allControls = [brightnessSlider, contrastSlider, saturateSlider, zoomSlider, rotationSlider, radiusSlider, octagonCornerSlider, borderWidthSlider, borderColorInput, bgColorInput];
         allControls.forEach(el => el.addEventListener('input', handleControlsChange));
         
         shapeTypeRadios.forEach(radio => radio.addEventListener('change', (e) => {
             shape = e.target.value;
             rectangleControls.classList.toggle('hidden', shape !== 'rectangle');
             octagonControls.classList.toggle('hidden', shape !== 'octagon');
+            requestAnimationFrame(draw);
+        }));
+
+        bgTypeRadios.forEach(radio => radio.addEventListener('change', (e) => {
+            isBgEnabled = e.target.value === 'on';
+            bgColorControls.classList.toggle('hidden', !isBgEnabled);
             requestAnimationFrame(draw);
         }));
 
@@ -170,6 +194,7 @@
                 case 'octagon-corner': octagonCorner = value / 100; octagonCornerValue.textContent = `${value}%`; break;
                 case 'border-width': borderWidth = value; borderWidthValue.textContent = `${value}px`; break;
                 case 'border-color': borderColor = value; break;
+                case 'bg-color': bgColor = value; break;
             }
             requestAnimationFrame(draw);
         }
@@ -191,6 +216,10 @@
             borderWidth = 0; borderWidthSlider.value = 0; borderWidthValue.textContent = '0px';
             borderColor = '#000000'; borderColorInput.value = '#000000';
 
+            isBgEnabled = false; document.querySelector('input[name="bg-type"][value="off"]').checked = true;
+            bgColorControls.classList.add('hidden');
+            bgColor = '#ffffff'; bgColorInput.value = '#ffffff';
+
             const hRatio = editorSize / image.width, vRatio = editorSize / image.height;
             minZoom = Math.max(hRatio, vRatio);
             zoom = minZoom; zoomSlider.value = 100; zoomValue.textContent = '100%';
@@ -206,7 +235,7 @@
                 img.onload = () => {
                     image = img;
                     editorPlaceholder.classList.add('hidden');
-                    controlsPanel.classList.remove('hidden');
+                    controlsPanel.classList.remove('opacity-0', 'pointer-events-none');
                     editorContainer.style.cursor = 'move';
                     downloadBtn.disabled = false; resetBtn.disabled = false;
                     resetAllChanges();
@@ -233,8 +262,17 @@
             previewCtx.clearRect(0, 0, size, size);
             previewCtx.save();
             
-            if (shape === 'octagon') createOctagonPath(previewCtx, 0, 0, size, size, octagonCorner);
-            else createRoundedRectPath(previewCtx, 0, 0, size, size, borderRadius);
+            if (shape === 'octagon') {
+                createOctagonPath(previewCtx, 0, 0, size, size, octagonCorner);
+            } else {
+                createRoundedRectPath(previewCtx, 0, 0, size, size, borderRadius);
+            }
+
+            if (isBgEnabled) {
+                previewCtx.fillStyle = bgColor;
+                previewCtx.fill();
+            }
+            
             previewCtx.clip();
 
             previewCtx.save();
