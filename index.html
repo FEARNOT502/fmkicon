@@ -6,7 +6,6 @@
     <title>아이콘 메이커</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal/dist/bundle.js"></script>
     <style>
         body { font-family: 'Noto Sans KR', sans-serif; }
         input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; background: #e5e7eb; border-radius: 5px; outline: none; opacity: 0.7; transition: opacity .2s; }
@@ -15,8 +14,9 @@
         input[type=range]::-moz-range-thumb { width: 20px; height: 20px; background: #5576C8; cursor: pointer; border-radius: 50%; border: 2px solid #ffffff; }
         #crop-box { position: absolute; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); pointer-events: none; }
         #editor-container { touch-action: none; }
-        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #5576C8; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        input[type="color"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; width: 100%; height: 40px; background-color: transparent; border: 1px solid #d1d5db; border-radius: 0.5rem; cursor: pointer; }
+        input[type="color"]::-webkit-color-swatch { border-radius: 0.375rem; border: none; }
+        input[type="color"]::-moz-color-swatch { border-radius: 0.375rem; border: none; }
     </style>
 </head>
 <body class="bg-white text-gray-800 flex items-center justify-center min-h-screen p-4">
@@ -24,6 +24,7 @@
     <div class="w-full max-w-4xl bg-gray-100 rounded-xl shadow-2xl p-6 md:p-8">
         <h1 class="text-3xl font-bold text-center text-gray-900 mb-6">아이콘 메이커</h1>
         <div class="flex flex-col lg:flex-row gap-8">
+            <!-- 컨트롤 패널 -->
             <div class="w-full lg:w-1/3 space-y-6">
                 <div>
                     <h3 class="block mb-2 text-sm font-bold text-gray-600">이미지 업로드</h3>
@@ -33,9 +34,6 @@
                 <div id="controls-panel" class="space-y-6 hidden">
                     <div>
                         <h3 class="block mb-2 text-sm font-bold text-gray-600">이미지 조정</h3>
-                        <button id="remove-bg-btn" class="w-full mb-4 px-4 py-2 bg-teal-500 text-white font-semibold rounded-lg hover:bg-teal-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors">
-                            배경 제거 (AI)
-                        </button>
                         <div class="space-y-4">
                             <div><label for="brightness" class="flex justify-between text-sm"><span>밝기</span><span id="brightness-value">100%</span></label><input type="range" id="brightness" min="0" max="200" value="100" class="w-full"></div>
                             <div><label for="contrast" class="flex justify-between text-sm"><span>대비</span><span id="contrast-value">100%</span></label><input type="range" id="contrast" min="0" max="200" value="100" class="w-full"></div>
@@ -50,18 +48,31 @@
                         <h3 class="block mb-2 text-sm font-bold text-gray-600">모서리 곡률</h3>
                         <div><label for="border-radius" class="flex justify-between text-sm"><span>곡률</span><span id="radius-value">0px</span></label><input type="range" id="border-radius" min="0" max="25" value="0" class="w-full"></div>
                     </div>
+                    <!-- 테두리 설정 섹션 추가 -->
+                    <div>
+                        <h3 class="block mb-2 text-sm font-bold text-gray-600">테두리 설정</h3>
+                        <div class="space-y-4">
+                            <div><label for="border-width" class="flex justify-between text-sm"><span>두께</span><span id="border-width-value">0px</span></label><input type="range" id="border-width" min="0" max="5" value="0" class="w-full"></div>
+                            <div><label for="border-color" class="text-sm"><span>색상</span></label><input type="color" id="border-color" value="#000000" class="w-full mt-1"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
+            <!-- 이미지 편집기 및 미리보기 -->
             <div class="w-full lg:w-2/3 flex flex-col items-center gap-6">
                 <div id="editor-container" class="relative w-full max-w-sm aspect-square bg-gray-300/50 rounded-lg overflow-hidden cursor-move flex items-center justify-center">
-                    <div id="loader" class="loader hidden"></div>
                     <canvas id="main-canvas" class="absolute top-0 left-0"></canvas>
                     <div id="crop-box" class="w-full h-full border-2 border-dashed border-[#5576C8]"></div>
                     <p id="editor-placeholder" class="text-gray-500 text-center">이미지를 업로드하거나<br>붙여넣어 주세요.</p>
                 </div>
-                <div class="text-center">
+                <div class="text-center w-full max-w-sm">
                     <h3 class="text-sm font-medium text-gray-600 mb-2">미리보기 (50x50)</h3>
                     <canvas id="preview-canvas" width="50" height="50" class="bg-gray-300 inline-block"></canvas>
+                    <!-- 파일 이름 입력 필드 추가 -->
+                    <div class="mt-4">
+                        <label for="filename-input" class="block text-sm font-medium text-gray-600 mb-1">파일 이름</label>
+                        <input type="text" id="filename-input" value="icon" class="w-full px-3 py-2 text-gray-800 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#5576C8]">
+                    </div>
                     <div class="flex items-center justify-center gap-2 mt-4">
                         <button id="reset-btn" class="px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors">초기화</button>
                         <button id="download-btn" class="px-6 py-2 bg-[#5576C8] text-white font-semibold rounded-lg hover:bg-[#4964a9] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors">아이콘 다운로드</button>
@@ -78,9 +89,7 @@
         const editorPlaceholder = document.getElementById('editor-placeholder');
         const downloadBtn = document.getElementById('download-btn');
         const resetBtn = document.getElementById('reset-btn');
-        const removeBgBtn = document.getElementById('remove-bg-btn'); // 배경 제거 버튼
-        const loader = document.getElementById('loader');
-
+        
         const mainCanvas = document.getElementById('main-canvas');
         const mainCtx = mainCanvas.getContext('2d');
         const previewCanvas = document.getElementById('preview-canvas');
@@ -91,28 +100,31 @@
         const saturateSlider = document.getElementById('saturate');
         const zoomSlider = document.getElementById('zoom');
         const radiusSlider = document.getElementById('border-radius');
+        const borderWidthSlider = document.getElementById('border-width');
+        const borderColorInput = document.getElementById('border-color');
+        const filenameInput = document.getElementById('filename-input');
 
         const brightnessValue = document.getElementById('brightness-value');
         const contrastValue = document.getElementById('contrast-value');
         const saturateValue = document.getElementById('saturate-value');
         const zoomValue = document.getElementById('zoom-value');
         const radiusValue = document.getElementById('radius-value');
+        const borderWidthValue = document.getElementById('border-width-value');
 
-        let originalImage = null; // 원본 이미지 저장용
-        let image = null; // 편집에 사용될 이미지
+        let image = null;
         let zoom = 1, minZoom = 1;
         let pos = { x: 0, y: 0 }, drag = { startX: 0, startY: 0, isDragging: false };
         let filters = { brightness: 100, contrast: 100, saturate: 100 };
         let borderRadius = 0;
+        let borderWidth = 0;
+        let borderColor = '#000000';
 
         let editorSize = editorContainer.clientWidth;
         mainCanvas.width = editorSize;
         mainCanvas.height = editorSize;
         downloadBtn.disabled = true;
         resetBtn.disabled = true;
-        removeBgBtn.disabled = true;
 
-        // --- 이벤트 리스너 ---
         imageUpload.addEventListener('change', (e) => { if (e.target.files[0]) loadImage(e.target.files[0]); });
         window.addEventListener('paste', (e) => {
             for (const item of e.clipboardData.items) {
@@ -120,47 +132,40 @@
             }
         });
 
-        // 3. 배경 제거 버튼 클릭 이벤트
-        removeBgBtn.addEventListener('click', async () => {
-            if (!originalImage) return;
-            loader.classList.remove('hidden'); // 로딩 시작
-            try {
-                // 라이브러리의 removeBackground 함수 호출
-                const blob = await removeBackground(originalImage);
-                const url = URL.createObjectURL(blob);
-                const newImage = new Image();
-                newImage.onload = () => {
-                    image = newImage; // 편집 이미지를 배경 제거된 이미지로 교체
-                    resetAllChanges(); // 새 이미지에 맞춰 설정 초기화
-                    loader.classList.add('hidden'); // 로딩 끝
-                };
-                newImage.src = url;
-            } catch (error) {
-                console.error("배경 제거 실패:", error);
-                alert("배경 제거에 실패했습니다. 다른 이미지를 사용해 보세요.");
-                loader.classList.add('hidden'); // 로딩 끝
+        [brightnessSlider, contrastSlider, saturateSlider, zoomSlider, radiusSlider, borderWidthSlider, borderColorInput].forEach(el => el.addEventListener('input', handleSliderChange));
+        
+        function handleSliderChange(e) {
+            const { id, value } = e.target;
+            switch(id) {
+                case 'brightness': filters.brightness = value; brightnessValue.textContent = `${value}%`; break;
+                case 'contrast': filters.contrast = value; contrastValue.textContent = `${value}%`; break;
+                case 'saturate': filters.saturate = value; saturateValue.textContent = `${value}%`; break;
+                case 'zoom': zoom = value / 100 * minZoom; zoomValue.textContent = `${value}%`; break;
+                case 'border-radius': borderRadius = value; radiusValue.textContent = `${value}px`; break;
+                case 'border-width': borderWidth = value; borderWidthValue.textContent = `${value}px`; break;
+                case 'border-color': borderColor = value; break;
             }
-        });
+            requestAnimationFrame(draw);
+        }
 
-        // ... 기존 이벤트 리스너들 (수정 없음) ...
-        [brightnessSlider, contrastSlider, saturateSlider, zoomSlider, radiusSlider].forEach(s => s.addEventListener('input', handleSliderChange));
         editorContainer.addEventListener('mousedown', (e) => { if (!image) return; drag.isDragging = true; drag.startX = e.clientX - pos.x; drag.startY = e.clientY - pos.y; editorContainer.style.cursor = 'grabbing'; });
         window.addEventListener('mousemove', (e) => { if (drag.isDragging) { pos.x = e.clientX - drag.startX; pos.y = e.clientY - drag.startY; requestAnimationFrame(draw); } });
         window.addEventListener('mouseup', () => { drag.isDragging = false; if (image) editorContainer.style.cursor = 'move'; });
         editorContainer.addEventListener('wheel', (e) => { if (!image) return; e.preventDefault(); const d = e.deltaY > 0 ? -10 : 10; const v = Math.max(10, Math.min(500, parseInt(zoomSlider.value) + d)); zoomSlider.value = v; zoom = v / 100 * minZoom; zoomValue.textContent = `${v}%`; requestAnimationFrame(draw); });
+        
         resetBtn.addEventListener('click', resetAllChanges);
-        downloadBtn.addEventListener('click', () => { if (!image) return; const c=document.createElement('canvas'), s=50; c.width=s; c.height=s; const t=c.getContext('2d'); t.save(); if(borderRadius>0){t.beginPath();t.moveTo(borderRadius,0);t.lineTo(s-borderRadius,0);t.arcTo(s,0,s,borderRadius,borderRadius);t.lineTo(s,s-borderRadius);t.arcTo(s,s,s-borderRadius,s,borderRadius);t.lineTo(borderRadius,s);t.arcTo(0,s,0,s-borderRadius,borderRadius);t.lineTo(0,borderRadius);t.arcTo(0,0,borderRadius,0,borderRadius);t.closePath();t.clip();} t.drawImage(previewCanvas,0,0,s,s); t.restore(); const l=document.createElement('a'); l.download='icon.png'; l.href=c.toDataURL('image/png'); l.click(); });
-        function handleSliderChange(e) { const { id, value } = e.target; switch(id) { case 'brightness': filters.brightness = value; brightnessValue.textContent = `${value}%`; break; case 'contrast': filters.contrast = value; contrastValue.textContent = `${value}%`; break; case 'saturate': filters.saturate = value; saturateValue.textContent = `${value}%`; break; case 'zoom': zoom = value / 100 * minZoom; zoomValue.textContent = `${value}%`; break; case 'border-radius': borderRadius = value; radiusValue.textContent = `${value}px`; break; } requestAnimationFrame(draw); }
+        downloadBtn.addEventListener('click', downloadIcon);
+        
         window.addEventListener('resize', () => { const s=editorContainer.clientWidth; if(s===editorSize) return; editorSize=s; mainCanvas.width=s; mainCanvas.height=s; if(image){ const h=s/image.width,v=s/image.height,o=minZoom; minZoom=Math.max(h,v); zoom=zoom*(minZoom/o); pos.x=(s-image.width*zoom)/2; pos.y=(s-image.height*zoom)/2; requestAnimationFrame(draw); } });
 
-
-        // --- 핵심 함수 ---
         function resetAllChanges() {
-            if (!image) return; // 편집 이미지를 기준으로 초기화
+            if (!image) return;
             filters = { brightness: 100, contrast: 100, saturate: 100 };
             brightnessSlider.value = 100; contrastSlider.value = 100; saturateSlider.value = 100;
             brightnessValue.textContent = '100%'; contrastValue.textContent = '100%'; saturateValue.textContent = '100%';
             borderRadius = 0; radiusSlider.value = 0; radiusValue.textContent = '0px';
+            borderWidth = 0; borderWidthSlider.value = 0; borderWidthValue.textContent = '0px';
+            borderColor = '#000000'; borderColorInput.value = '#000000';
             const hRatio = editorSize / image.width; const vRatio = editorSize / image.height;
             minZoom = Math.max(hRatio, vRatio);
             zoom = minZoom; zoomSlider.value = 100; zoomValue.textContent = '100%';
@@ -173,14 +178,12 @@
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
-                    originalImage = img; // 원본 이미지를 항상 보관
-                    image = img; // 편집용 이미지도 일단 원본으로 설정
+                    image = img;
                     editorPlaceholder.classList.add('hidden');
                     controlsPanel.classList.remove('hidden');
                     editorContainer.style.cursor = 'move';
                     downloadBtn.disabled = false;
                     resetBtn.disabled = false;
-                    removeBgBtn.disabled = false;
                     resetAllChanges();
                 };
                 img.src = e.target.result;
@@ -190,18 +193,74 @@
 
         function draw() {
             if (!image) return;
+            const size = 50;
             const filterString = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%)`;
+            
+            // 메인 캔버스 그리기
             mainCtx.clearRect(0, 0, editorSize, editorSize);
             mainCtx.save();
             mainCtx.filter = filterString;
             mainCtx.drawImage(image, pos.x, pos.y, image.width * zoom, image.height * zoom);
             mainCtx.restore();
-            previewCtx.clearRect(0, 0, 50, 50);
+            
+            // 미리보기 캔버스 그리기 (다운로드 로직과 동일하게)
+            previewCtx.clearRect(0, 0, size, size);
             previewCtx.save();
+            
+            // 1. 둥근 사각형으로 클리핑
+            createRoundedRectPath(previewCtx, 0, 0, size, size, borderRadius);
+            previewCtx.clip();
+
+            // 2. 이미지 그리기
             previewCtx.filter = filterString;
-            previewCtx.drawImage(image, -pos.x / zoom, -pos.y / zoom, editorSize / zoom, editorSize / zoom, 0, 0, 50, 50);
+            previewCtx.drawImage(image, -pos.x / zoom, -pos.y / zoom, editorSize / zoom, editorSize / zoom, 0, 0, size, size);
+            
+            // 3. 테두리 그리기
+            if (borderWidth > 0) {
+                const halfBorder = borderWidth / 2;
+                const borderRad = Math.max(0, borderRadius - halfBorder);
+                createRoundedRectPath(previewCtx, halfBorder, halfBorder, size - borderWidth, size - borderWidth, borderRad);
+                previewCtx.strokeStyle = borderColor;
+                previewCtx.lineWidth = borderWidth;
+                previewCtx.stroke();
+            }
+
             previewCtx.restore();
+
+            // 캔버스 자체의 시각적 효과 (다운로드 파일에는 영향 없음)
             previewCanvas.style.borderRadius = `${borderRadius}px`;
+        }
+
+        function createRoundedRectPath(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.arcTo(x + width, y, x + width, y + radius, radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.arcTo(x + width, y + height, x + width - radius, y + height, radius);
+            ctx.lineTo(x + radius, y + height);
+            ctx.arcTo(x, y + height, x, y + height - radius, radius);
+            ctx.lineTo(x, y + radius);
+            ctx.arcTo(x, 0, x + radius, y, radius);
+            ctx.closePath();
+        }
+
+        function downloadIcon() {
+            if (!image) return;
+            const tempCanvas = document.createElement('canvas');
+            const size = 50;
+            tempCanvas.width = size;
+            tempCanvas.height = size;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // 미리보기 캔버스에 그려진 내용을 그대로 복사
+            tempCtx.drawImage(previewCanvas, 0, 0, size, size);
+            
+            const filename = filenameInput.value || 'icon';
+            const link = document.createElement('a');
+            link.download = `${filename}.png`;
+            link.href = tempCanvas.toDataURL('image/png');
+            link.click();
         }
     </script>
 </body>
