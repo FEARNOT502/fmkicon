@@ -17,6 +17,7 @@
         input[type="color"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; width: 100%; height: 40px; background-color: transparent; border: 1px solid #d1d5db; border-radius: 0.5rem; cursor: pointer; }
         input[type="color"]::-webkit-color-swatch { border-radius: 0.375rem; border: none; }
         input[type="color"]::-moz-color-swatch { border-radius: 0.375rem; border: none; }
+        .eyedropper-active { cursor: crosshair !important; }
     </style>
 </head>
 <body class="bg-white text-gray-800 flex items-center justify-center min-h-screen p-4">
@@ -48,19 +49,39 @@
                         <h3 class="block mb-2 text-sm font-bold text-gray-600">모서리 곡률</h3>
                         <div><label for="border-radius" class="flex justify-between text-sm"><span>곡률</span><span id="radius-value">0px</span></label><input type="range" id="border-radius" min="0" max="25" value="0" class="w-full"></div>
                     </div>
-                    <!-- 테두리 설정 섹션 추가 -->
                     <div>
                         <h3 class="block mb-2 text-sm font-bold text-gray-600">테두리 설정</h3>
                         <div class="space-y-4">
                             <div><label for="border-width" class="flex justify-between text-sm"><span>두께</span><span id="border-width-value">0px</span></label><input type="range" id="border-width" min="0" max="5" value="0" class="w-full"></div>
-                            <div><label for="border-color" class="text-sm"><span>색상</span></label><input type="color" id="border-color" value="#000000" class="w-full mt-1"></div>
+                            <div class="flex items-center gap-4">
+                                <label><input type="radio" name="border-type" value="solid" checked class="mr-1">단색</label>
+                                <label><input type="radio" name="border-type" value="gradient" class="mr-1">그라데이션</label>
+                            </div>
+                            <div id="solid-color-controls">
+                                <label for="border-color-solid" class="text-sm">색상</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="color" id="border-color-solid" value="#000000" class="w-full mt-1">
+                                    <button id="eyedropper-btn-solid" class="p-2 bg-gray-200 rounded-md hover:bg-gray-300" title="스포이트">🎨</button>
+                                </div>
+                            </div>
+                            <div id="gradient-color-controls" class="hidden">
+                                <label class="text-sm">시작 색상</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="color" id="border-color-start" value="#000000" class="w-full mt-1">
+                                    <button id="eyedropper-btn-start" class="p-2 bg-gray-200 rounded-md hover:bg-gray-300" title="스포이트">🎨</button>
+                                </div>
+                                <label class="text-sm mt-2">끝 색상</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="color" id="border-color-end" value="#ffffff" class="w-full mt-1">
+                                    <button id="eyedropper-btn-end" class="p-2 bg-gray-200 rounded-md hover:bg-gray-300" title="스포이트">🎨</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <!-- 이미지 편집기 및 미리보기 -->
             <div class="w-full lg:w-2/3 flex flex-col items-center gap-6">
-                <div id="editor-container" class="relative w-full max-w-sm aspect-square bg-gray-300/50 rounded-lg overflow-hidden cursor-move flex items-center justify-center">
+                <div id="editor-container" class="relative w-full max-w-sm aspect-square bg-gray-300/50 rounded-lg overflow-hidden flex items-center justify-center">
                     <canvas id="main-canvas" class="absolute top-0 left-0"></canvas>
                     <div id="crop-box" class="w-full h-full border-2 border-dashed border-[#5576C8]"></div>
                     <p id="editor-placeholder" class="text-gray-500 text-center">이미지를 업로드하거나<br>붙여넣어 주세요.</p>
@@ -68,7 +89,6 @@
                 <div class="text-center w-full max-w-sm">
                     <h3 class="text-sm font-medium text-gray-600 mb-2">미리보기 (50x50)</h3>
                     <canvas id="preview-canvas" width="50" height="50" class="bg-gray-300 inline-block"></canvas>
-                    <!-- 파일 이름 입력 필드 추가 -->
                     <div class="mt-4">
                         <label for="filename-input" class="block text-sm font-medium text-gray-600 mb-1">파일 이름</label>
                         <input type="text" id="filename-input" value="icon" class="w-full px-3 py-2 text-gray-800 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#5576C8]">
@@ -83,41 +103,47 @@
     </div>
 
     <script>
+        // DOM 요소들
         const imageUpload = document.getElementById('image-upload');
         const controlsPanel = document.getElementById('controls-panel');
         const editorContainer = document.getElementById('editor-container');
         const editorPlaceholder = document.getElementById('editor-placeholder');
         const downloadBtn = document.getElementById('download-btn');
         const resetBtn = document.getElementById('reset-btn');
-        
         const mainCanvas = document.getElementById('main-canvas');
         const mainCtx = mainCanvas.getContext('2d');
         const previewCanvas = document.getElementById('preview-canvas');
         const previewCtx = previewCanvas.getContext('2d');
-
-        const brightnessSlider = document.getElementById('brightness');
-        const contrastSlider = document.getElementById('contrast');
-        const saturateSlider = document.getElementById('saturate');
-        const zoomSlider = document.getElementById('zoom');
-        const radiusSlider = document.getElementById('border-radius');
-        const borderWidthSlider = document.getElementById('border-width');
-        const borderColorInput = document.getElementById('border-color');
         const filenameInput = document.getElementById('filename-input');
 
-        const brightnessValue = document.getElementById('brightness-value');
-        const contrastValue = document.getElementById('contrast-value');
-        const saturateValue = document.getElementById('saturate-value');
-        const zoomValue = document.getElementById('zoom-value');
-        const radiusValue = document.getElementById('radius-value');
-        const borderWidthValue = document.getElementById('border-width-value');
+        // 컨트롤러 요소들
+        const brightnessSlider = document.getElementById('brightness'), brightnessValue = document.getElementById('brightness-value');
+        const contrastSlider = document.getElementById('contrast'), contrastValue = document.getElementById('contrast-value');
+        const saturateSlider = document.getElementById('saturate'), saturateValue = document.getElementById('saturate-value');
+        const zoomSlider = document.getElementById('zoom'), zoomValue = document.getElementById('zoom-value');
+        const radiusSlider = document.getElementById('border-radius'), radiusValue = document.getElementById('radius-value');
+        const borderWidthSlider = document.getElementById('border-width'), borderWidthValue = document.getElementById('border-width-value');
+        
+        // 테두리 관련 요소
+        const borderTypeRadios = document.querySelectorAll('input[name="border-type"]');
+        const solidColorControls = document.getElementById('solid-color-controls');
+        const gradientColorControls = document.getElementById('gradient-color-controls');
+        const borderColorSolidInput = document.getElementById('border-color-solid');
+        const borderColorStartInput = document.getElementById('border-color-start');
+        const borderColorEndInput = document.getElementById('border-color-end');
+        const eyedropperBtnSolid = document.getElementById('eyedropper-btn-solid');
+        const eyedropperBtnStart = document.getElementById('eyedropper-btn-start');
+        const eyedropperBtnEnd = document.getElementById('eyedropper-btn-end');
 
-        let image = null;
-        let zoom = 1, minZoom = 1;
+        // 상태 변수
+        let image = null, zoom = 1, minZoom = 1;
         let pos = { x: 0, y: 0 }, drag = { startX: 0, startY: 0, isDragging: false };
         let filters = { brightness: 100, contrast: 100, saturate: 100 };
-        let borderRadius = 0;
-        let borderWidth = 0;
-        let borderColor = '#000000';
+        let borderRadius = 0, borderWidth = 0;
+        let borderType = 'solid';
+        let borderColorSolid = '#000000', borderColorStart = '#000000', borderColorEnd = '#ffffff';
+        let isEyedropperActive = false;
+        let activeColorInput = null;
 
         let editorSize = editorContainer.clientWidth;
         mainCanvas.width = editorSize;
@@ -125,16 +151,31 @@
         downloadBtn.disabled = true;
         resetBtn.disabled = true;
 
+        // --- 이벤트 리스너 ---
         imageUpload.addEventListener('change', (e) => { if (e.target.files[0]) loadImage(e.target.files[0]); });
-        window.addEventListener('paste', (e) => {
-            for (const item of e.clipboardData.items) {
-                if (item.type.includes('image')) { loadImage(item.getAsFile()); break; }
-            }
-        });
-
-        [brightnessSlider, contrastSlider, saturateSlider, zoomSlider, radiusSlider, borderWidthSlider, borderColorInput].forEach(el => el.addEventListener('input', handleSliderChange));
+        window.addEventListener('paste', (e) => { for (const item of e.clipboardData.items) { if (item.type.includes('image')) { loadImage(item.getAsFile()); break; } } });
         
-        function handleSliderChange(e) {
+        const allControls = [brightnessSlider, contrastSlider, saturateSlider, zoomSlider, radiusSlider, borderWidthSlider, borderColorSolidInput, borderColorStartInput, borderColorEndInput];
+        allControls.forEach(el => el.addEventListener('input', handleControlsChange));
+        
+        borderTypeRadios.forEach(radio => radio.addEventListener('change', (e) => {
+            borderType = e.target.value;
+            solidColorControls.classList.toggle('hidden', borderType !== 'solid');
+            gradientColorControls.classList.toggle('hidden', borderType !== 'gradient');
+            requestAnimationFrame(draw);
+        }));
+
+        eyedropperBtnSolid.addEventListener('click', () => activateEyedropper(borderColorSolidInput));
+        eyedropperBtnStart.addEventListener('click', () => activateEyedropper(borderColorStartInput));
+        eyedropperBtnEnd.addEventListener('click', () => activateEyedropper(borderColorEndInput));
+
+        mainCanvas.addEventListener('click', pickColor);
+
+        resetBtn.addEventListener('click', resetAllChanges);
+        downloadBtn.addEventListener('click', downloadIcon);
+        
+        // --- 함수 ---
+        function handleControlsChange(e) {
             const { id, value } = e.target;
             switch(id) {
                 case 'brightness': filters.brightness = value; brightnessValue.textContent = `${value}%`; break;
@@ -143,33 +184,58 @@
                 case 'zoom': zoom = value / 100 * minZoom; zoomValue.textContent = `${value}%`; break;
                 case 'border-radius': borderRadius = value; radiusValue.textContent = `${value}px`; break;
                 case 'border-width': borderWidth = value; borderWidthValue.textContent = `${value}px`; break;
-                case 'border-color': borderColor = value; break;
+                case 'border-color-solid': borderColorSolid = value; break;
+                case 'border-color-start': borderColorStart = value; break;
+                case 'border-color-end': borderColorEnd = value; break;
             }
             requestAnimationFrame(draw);
         }
 
-        editorContainer.addEventListener('mousedown', (e) => { if (!image) return; drag.isDragging = true; drag.startX = e.clientX - pos.x; drag.startY = e.clientY - pos.y; editorContainer.style.cursor = 'grabbing'; });
-        window.addEventListener('mousemove', (e) => { if (drag.isDragging) { pos.x = e.clientX - drag.startX; pos.y = e.clientY - drag.startY; requestAnimationFrame(draw); } });
-        window.addEventListener('mouseup', () => { drag.isDragging = false; if (image) editorContainer.style.cursor = 'move'; });
-        editorContainer.addEventListener('wheel', (e) => { if (!image) return; e.preventDefault(); const d = e.deltaY > 0 ? -10 : 10; const v = Math.max(10, Math.min(500, parseInt(zoomSlider.value) + d)); zoomSlider.value = v; zoom = v / 100 * minZoom; zoomValue.textContent = `${v}%`; requestAnimationFrame(draw); });
-        
-        resetBtn.addEventListener('click', resetAllChanges);
-        downloadBtn.addEventListener('click', downloadIcon);
-        
-        window.addEventListener('resize', () => { const s=editorContainer.clientWidth; if(s===editorSize) return; editorSize=s; mainCanvas.width=s; mainCanvas.height=s; if(image){ const h=s/image.width,v=s/image.height,o=minZoom; minZoom=Math.max(h,v); zoom=zoom*(minZoom/o); pos.x=(s-image.width*zoom)/2; pos.y=(s-image.height*zoom)/2; requestAnimationFrame(draw); } });
+        function activateEyedropper(targetInput) {
+            isEyedropperActive = true;
+            activeColorInput = targetInput;
+            editorContainer.classList.add('eyedropper-active');
+        }
+
+        function pickColor(e) {
+            if (!isEyedropperActive || !image) return;
+            const rect = mainCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const pixel = mainCtx.getImageData(x, y, 1, 1).data;
+            const color = `#${("000000" + ((pixel[0] << 16) | (pixel[1] << 8) | pixel[2]).toString(16)).slice(-6)}`;
+            
+            activeColorInput.value = color;
+            activeColorInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+            isEyedropperActive = false;
+            activeColorInput = null;
+            editorContainer.classList.remove('eyedropper-active');
+        }
 
         function resetAllChanges() {
             if (!image) return;
             filters = { brightness: 100, contrast: 100, saturate: 100 };
-            brightnessSlider.value = 100; contrastSlider.value = 100; saturateSlider.value = 100;
-            brightnessValue.textContent = '100%'; contrastValue.textContent = '100%'; saturateValue.textContent = '100%';
+            [brightnessSlider, contrastSlider, saturateSlider].forEach(s => s.value = 100);
+            [brightnessValue, contrastValue, saturateValue].forEach(v => v.textContent = '100%');
+            
             borderRadius = 0; radiusSlider.value = 0; radiusValue.textContent = '0px';
             borderWidth = 0; borderWidthSlider.value = 0; borderWidthValue.textContent = '0px';
-            borderColor = '#000000'; borderColorInput.value = '#000000';
-            const hRatio = editorSize / image.width; const vRatio = editorSize / image.height;
+            
+            borderType = 'solid';
+            document.querySelector('input[name="border-type"][value="solid"]').checked = true;
+            solidColorControls.classList.remove('hidden');
+            gradientColorControls.classList.add('hidden');
+            
+            borderColorSolid = '#000000'; borderColorSolidInput.value = '#000000';
+            borderColorStart = '#000000'; borderColorStartInput.value = '#000000';
+            borderColorEnd = '#ffffff'; borderColorEndInput.value = '#ffffff';
+
+            const hRatio = editorSize / image.width, vRatio = editorSize / image.height;
             minZoom = Math.max(hRatio, vRatio);
             zoom = minZoom; zoomSlider.value = 100; zoomValue.textContent = '100%';
-            pos.x = (editorSize - image.width * zoom) / 2; pos.y = (editorSize - image.height * zoom) / 2;
+            pos.x = (editorSize - image.width * zoom) / 2;
+            pos.y = (editorSize - image.height * zoom) / 2;
             requestAnimationFrame(draw);
         }
 
@@ -182,8 +248,7 @@
                     editorPlaceholder.classList.add('hidden');
                     controlsPanel.classList.remove('hidden');
                     editorContainer.style.cursor = 'move';
-                    downloadBtn.disabled = false;
-                    resetBtn.disabled = false;
+                    downloadBtn.disabled = false; resetBtn.disabled = false;
                     resetAllChanges();
                 };
                 img.src = e.target.result;
@@ -196,39 +261,37 @@
             const size = 50;
             const filterString = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%)`;
             
-            // 메인 캔버스 그리기
             mainCtx.clearRect(0, 0, editorSize, editorSize);
             mainCtx.save();
             mainCtx.filter = filterString;
             mainCtx.drawImage(image, pos.x, pos.y, image.width * zoom, image.height * zoom);
             mainCtx.restore();
             
-            // 미리보기 캔버스 그리기 (다운로드 로직과 동일하게)
             previewCtx.clearRect(0, 0, size, size);
             previewCtx.save();
-            
-            // 1. 둥근 사각형으로 클리핑
             createRoundedRectPath(previewCtx, 0, 0, size, size, borderRadius);
             previewCtx.clip();
-
-            // 2. 이미지 그리기
             previewCtx.filter = filterString;
             previewCtx.drawImage(image, -pos.x / zoom, -pos.y / zoom, editorSize / zoom, editorSize / zoom, 0, 0, size, size);
             
-            // 3. 테두리 그리기
             if (borderWidth > 0) {
                 const halfBorder = borderWidth / 2;
                 const borderRad = Math.max(0, borderRadius - halfBorder);
                 createRoundedRectPath(previewCtx, halfBorder, halfBorder, size - borderWidth, size - borderWidth, borderRad);
-                previewCtx.strokeStyle = borderColor;
+                
+                if (borderType === 'gradient') {
+                    const gradient = previewCtx.createLinearGradient(0, 0, 0, size);
+                    gradient.addColorStop(0, borderColorStart);
+                    gradient.addColorStop(1, borderColorEnd);
+                    previewCtx.strokeStyle = gradient;
+                } else {
+                    previewCtx.strokeStyle = borderColorSolid;
+                }
+                
                 previewCtx.lineWidth = borderWidth;
                 previewCtx.stroke();
             }
-
             previewCtx.restore();
-
-            // 캔버스 자체의 시각적 효과 (다운로드 파일에는 영향 없음)
-            previewCanvas.style.borderRadius = `${borderRadius}px`;
         }
 
         function createRoundedRectPath(ctx, x, y, width, height, radius) {
@@ -252,16 +315,20 @@
             tempCanvas.width = size;
             tempCanvas.height = size;
             const tempCtx = tempCanvas.getContext('2d');
-
-            // 미리보기 캔버스에 그려진 내용을 그대로 복사
             tempCtx.drawImage(previewCanvas, 0, 0, size, size);
-            
             const filename = filenameInput.value || 'icon';
             const link = document.createElement('a');
             link.download = `${filename}.png`;
             link.href = tempCanvas.toDataURL('image/png');
             link.click();
         }
+
+        // 초기화 및 리사이즈 로직
+        editorContainer.addEventListener('mousedown', (e) => { if (!image) return; drag.isDragging = true; drag.startX = e.clientX - pos.x; drag.startY = e.clientY - pos.y; editorContainer.style.cursor = 'grabbing'; });
+        window.addEventListener('mousemove', (e) => { if (drag.isDragging) { pos.x = e.clientX - drag.startX; pos.y = e.clientY - drag.startY; requestAnimationFrame(draw); } });
+        window.addEventListener('mouseup', () => { drag.isDragging = false; if (image) editorContainer.style.cursor = 'move'; });
+        editorContainer.addEventListener('wheel', (e) => { if (!image) return; e.preventDefault(); const d = e.deltaY > 0 ? -10 : 10; const v = Math.max(10, Math.min(500, parseInt(zoomSlider.value) + d)); zoomSlider.value = v; zoom = v / 100 * minZoom; zoomValue.textContent = `${v}%`; requestAnimationFrame(draw); });
+        window.addEventListener('resize', () => { const s=editorContainer.clientWidth; if(s===editorSize) return; editorSize=s; mainCanvas.width=s; mainCanvas.height=s; if(image){ const h=s/image.width,v=s/image.height,o=minZoom; minZoom=Math.max(h,v); zoom=zoom*(minZoom/o); pos.x=(s-image.width*zoom)/2; pos.y=(s-image.height*zoom)/2; requestAnimationFrame(draw); } });
     </script>
 </body>
 </html>
