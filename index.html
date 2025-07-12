@@ -163,13 +163,15 @@
 
         // 이벤트 핸들러
         function handleControlsChange(e) {
-            const { id, value } = e.target;
+            const { id, value, type } = e.target;
             const control = controlMap[id];
             if (!control) return;
 
-            let propValue = parseFloat(value);
+            // BUG FIX: color 타입은 문자열로, range 타입은 숫자로 처리
+            let propValue = type === 'range' ? parseFloat(value) : value;
+
             if (control.isRatio) propValue /= 100;
-            if (control.isMinZoom) propValue = (propValue / 100) * state.minZoom;
+            if (control.isMinZoom) propValue = (parseFloat(value) / 100) * state.minZoom;
 
             const keys = control.stateKey.split('.');
             let tempState = state;
@@ -179,7 +181,7 @@
             tempState[keys[keys.length - 1]] = propValue;
             
             const valueEl = $(`#${id}-value`);
-            if (valueEl) valueEl.textContent = `${value}${control.unit}`;
+            if (valueEl) valueEl.textContent = `${value}${control.unit || ''}`;
             
             requestAnimationFrame(draw);
         }
@@ -205,7 +207,7 @@
                 
                 el.value = value;
                 const valueEl = $(`#${id}-value`);
-                if (valueEl) valueEl.textContent = `${el.value}${controlMap[id].unit}`;
+                if (valueEl) valueEl.textContent = `${el.value}${controlMap[id].unit || ''}`;
             }
             
             $$('input[name="shape-type"]').forEach(r => r.checked = r.value === state.shape);
@@ -361,7 +363,10 @@
             elements.imageUpload.addEventListener('change', (e) => { if (e.target.files[0]) loadImage(e.target.files[0]); });
             window.addEventListener('paste', (e) => { for (const item of e.clipboardData.items) { if (item.type.includes('image')) { loadImage(item.getAsFile()); break; } } });
             
-            $$('#controls-panel input').forEach(el => el.addEventListener('input', handleControlsChange));
+            for (const id in controlMap) {
+                const el = $(`#${id}`);
+                if (el) el.addEventListener('input', handleControlsChange);
+            }
             $$('input[name="shape-type"]').forEach(radio => radio.addEventListener('change', (e) => { state.shape = e.target.value; elements.rectangleControls.classList.toggle('hidden', state.shape !== 'rectangle'); elements.octagonControls.classList.toggle('hidden', state.shape !== 'octagon'); requestAnimationFrame(draw); }));
             $$('input[name="bg-type"]').forEach(radio => radio.addEventListener('change', (e) => { state.isBgEnabled = e.target.value === 'on'; elements.bgColorControls.classList.toggle('hidden', !state.isBgEnabled); requestAnimationFrame(draw); }));
 
